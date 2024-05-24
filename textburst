@@ -1,0 +1,108 @@
+#!/usr/bin/python3
+
+import argparse
+import yaml
+from itertools import product
+from jinja2 import Template
+from time import sleep
+import os
+import stat
+
+
+def get_dict_from_yaml_file(yaml_filename: str) -> dict:
+    """opens a yaml file and returns its content as dict"""
+
+    with open(yaml_filename, 'r') as yaml_file:
+        content = yaml.safe_load(yaml_file)
+
+    return content
+
+
+def get_jinja2_template(template_filename: str) -> Template:
+    """reads the jinja2 template and returns it as Template object"""
+
+    with open(template_filename) as template_file:
+        template = Template(template_file.read())
+
+    return template
+
+
+def zip_to_dict(keys: list, values: list) -> dict:
+    """creates a dictionary from 2 lists - list 1 contains the keys and list 2 the corresponding values"""
+    
+    # see https://www.geeksforgeeks.org/python-convert-two-lists-into-a-dictionary/
+    res = dict(map(lambda key, value : (key, value) , keys, values))
+
+    return res
+
+
+def gen_render_config(param_dict: dict):
+    """generator for the single combination of parameters"""
+
+    for values in product(*param_dict.values()):
+        render_config = zip_to_dict(param_dict.keys(), values)
+        
+        yield render_config
+
+
+def write_to_named_pipe(named_pipe: str, content: str):
+    """writes content to a named pipe"""
+    
+    with open(named_pipe, 'w') as fifo_writer:
+        os.write(fifo_writer.fileno(), content.encode())
+        # wait a little
+        sleep(0.01)
+
+
+def check_and_create_named_pipe(named_pipe_filename):
+    """checks if the named pipe esxists or creates it otherwise"""
+
+    try:
+        file_stat = os.stat(named_pipe_filename)
+        if not stat.S_ISFIFO(file_stat.st_mode):
+            raise Exception(f'Error: "{named_pipe_filename}" is not a named pipe')
+    except FileNotFoundError:
+        # create if named pipe does not exists
+        try:
+            os.mkfifo(named_pipe_filename)
+        except OSError as e:
+            print(f"Failed to create FIFO: {e}")
+
+
+def main(config_filename, template_filename, named_pipe_filename):
+    
+    # read textburst config
+    param_dict = get_dict_from_yaml_file(config_filename)
+
+    # read template
+    template = get_jinja2_template(template_filename)
+
+    # loop thru the combinations of parameters and write them to the named pipe
+    for render_config in gen_render_config(param_dict):
+        rendered_content = template.render(**render_config)
+        write_to_named_pipe(named_pipe_filename, rendered_content)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="example: ./textburst textburst.yaml config.yaml.j2 config_fifo &")
+
+    parser.add_argument("config_filename", type=str, help="TextBurst config")
+    parser.add_argument("template_filename", type=str, help="Jinja2 Template")
+    parser.add_argument("named_pipe_filename", type=str, help="named pipe")
+
+    args = parser.parse_args()
+
+    # check input files
+    
+    # config_filename
+    if not os.path.isfile(args.config_filename):
+         raise FileNotFoundError(args.config_filename)
+    # template_filename
+    if not os.path.isfile(args.template_filename):
+         raise FileNotFoundError(args.template_filename)
+    # named_pipe_filename"
+    check_and_create_named_pipe(args.named_pipe_filename)
+    
+    # run main
+    main(args.config_filename, args.template_filename, args.named_pipe_filename)
+
