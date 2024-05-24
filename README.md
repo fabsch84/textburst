@@ -41,8 +41,8 @@ Run **textburst** to populate a named pipe with each possible combination sequen
 Read from the named pipe to get each text individually.
 
 ```bash
-cat text < config_fifo
-cat text < config_fifo
-cat text < config_fifo
+cat < config_fifo
+cat < config_fifo
+cat < config_fifo
 ...
 ```
