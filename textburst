@@ -48,11 +48,12 @@ def gen_render_config(param_dict: dict):
 def write_to_named_pipe(named_pipe: str, content: str):
     """writes content to a named pipe"""
     
-    with open(named_pipe, 'w') as fifo_writer:
-        os.write(fifo_writer.fileno(), content.encode())
-        # wait a little
-        sleep(0.01)
-
+    with open(named_pipe, "wb") as fifo_writer:
+        fifo_writer.write(content.encode("UTF-8"))
+    
+    # wait a little
+    sleep(0.01)
+    
 
 def check_and_create_named_pipe(named_pipe_filename):
     """checks if the named pipe esxists or creates it otherwise"""
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     # template_filename
     if not os.path.isfile(args.template_filename):
          raise FileNotFoundError(args.template_filename)
-    # named_pipe_filename"
+    # named_pipe_filename
     check_and_create_named_pipe(args.named_pipe_filename)
     
     # run main
